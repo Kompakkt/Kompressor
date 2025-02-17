@@ -8,9 +8,7 @@ WORKDIR /app
 
 ## Prepare Schwarzwald ##
 RUN mkdir -p /usr/lib/x86_64-linux-gnu/
-COPY --from=schwarzwald /usr/lib/liblaszip.so /usr/lib/
-COPY --from=schwarzwald /usr/lib/libproj.so* /usr/lib/
-COPY --from=schwarzwald /pointcloud-tiler/Schwarzwald/build/Release/Schwarzwald /usr/local/bin/Schwarzwald
+RUN ln -s /pointcloud-tiler/Schwarzwald/build/Release/Schwarzwald /usr/local/bin/Schwarzwald
 
 # Execute for testing
 RUN /usr/local/bin/Schwarzwald
