@@ -17,6 +17,7 @@ class ProcessingEntry {
   type: "cloud" | "model";
   state: State = "QUEUED";
   #now = Date.now().toString();
+  progress: number = 0;
 
   constructor(id: string, type: "cloud" | "model") {
     this.id = id;
@@ -72,7 +73,43 @@ class ProcessingEntry {
 
     const command = `stdbuf -oL Schwarzwald --tiler --cache-size 256MB --output-format ENTWINE_LAZ -i ${inFile} -o ${outPath} >> ${logFile} 2>&1`;
     const process = Bun.$`sh -c "${command}"`;
-    return process;
+    let resolved = false;
+    process.then(() => {
+      resolved = true;
+    });
+    return new Promise<void>(async (resolve) => {
+      const readProgress = async () => {
+        try {
+          const file = Bun.file(logFile);
+          const content = await file.text();
+          const progressLine = content
+            .split("\n")
+            .filter((line) => line.includes("] indexing:"))
+            .at(-1)!;
+          const [currentString, _, totalString] = progressLine
+            .split(/\s+/)
+            .slice(2, 5);
+          const [current, total] = [currentString, totalString].map((v) => {
+            v = v.replace("k", "").replace(".", "");
+            if (v.includes("M")) {
+              v = v.replace("M", "");
+              return parseFloat(v) * 1000;
+            }
+            return parseFloat(v);
+          });
+          const progress = +((current / total) * 100).toFixed(2);
+          this.progress = progress;
+        } catch (_) {}
+        setTimeout(() => {
+          if (!resolved) {
+            readProgress();
+          } else {
+            resolve();
+          }
+        }, 100);
+      };
+      readProgress();
+    });
   }
 
   async #useObj2Glb() {
@@ -98,7 +135,13 @@ class ProcessingEntry {
     }
 
     console.log(`Converting ${inFile} to GLB...`);
-    return convertToGLB(inFile);
+    return new Promise<void>(async (resolve) => {
+      for await (const progress of convertToGLB(inFile)) {
+        const cleanProgress = +(progress * 100).toFixed(2);
+        this.progress = cleanProgress;
+      }
+      resolve();
+    });
   }
 
   async start() {
@@ -161,10 +204,10 @@ const app = new Elysia()
       return error("Not Found");
     }
 
-    if (entry?.state === "DONE") {
+    if (entry.state === "DONE") {
       return { progress: 100, finished: true, state: entry.state };
     }
-    if (entry?.state === "ERROR") {
+    if (entry.state === "ERROR") {
       return {
         progress: -1,
         finished: false,
@@ -172,43 +215,16 @@ const app = new Elysia()
         message: "Processing failed",
       };
     }
-    if (entry?.state === "QUEUED") {
+    if (entry.state === "QUEUED") {
       entry.start();
       return { progress: 0, finished: false, state: entry.state };
     }
 
-    if (!entry?.logFile) {
-      return error("Not Found");
-    }
-
-    const logFile = Bun.file(entry.logFile);
-    if (!(await logFile.exists())) {
-      return error("Not Found");
-    }
-
-    try {
-      const content = await logFile.text();
-      const progressLine = content
-        .split("\n")
-        .filter((line) => line.includes("] indexing:"))
-        .at(-1);
-      if (!progressLine) {
-        return { progress: 0, finished: false, state: entry.state };
-      }
-      const match = progressLine.match(
-        /\]\sindexing:\s(\d*\.?\d*)M?\s\/\s(\d*\.?\d*)M?/g,
-      );
-      if (!match) {
-        return { progress: 0, finished: false, state: entry.state };
-      }
-      const [_, current, goal] = match.map((v) => parseFloat(v));
-      const progress = Math.round((current / goal) * 100);
-
-      return { progress, finished: false, state: entry.state };
-    } catch (error) {
-      console.error(error);
-      return { progress: 0, finished: false, state: entry.state };
-    }
+    return {
+      progress: entry.progress,
+      finished: false,
+      state: entry.state,
+    };
   })
   .get("/queue", () => {
     return [...processingMap.values()].filter(
