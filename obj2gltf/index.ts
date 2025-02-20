@@ -98,7 +98,7 @@ export async function* convertToGLB(
       // WebP supports up to 16383x16383
       resize: [16383, 16383],
       nearLossless: true,
-      effort: 70,
+      effort: 1,
       limitInputPixels: false,
     }),
   );
