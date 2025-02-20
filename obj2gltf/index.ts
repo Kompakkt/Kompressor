@@ -12,7 +12,7 @@ import {
   prune,
   resample,
   sparse,
-  textureCompress,
+  // textureCompress,
   weld,
 } from "@gltf-transform/functions";
 import sharp from "sharp";
@@ -90,7 +90,7 @@ export async function* convertToGLB(
   console.timeEnd("gltf-transform sparse");
   yield 12 / 15;
 
-  console.time("gltf-transform textureCompress");
+  /*console.time("gltf-transform textureCompress");
   await document.transform(
     textureCompress({
       encoder: sharp,
@@ -103,7 +103,7 @@ export async function* convertToGLB(
     }),
   );
   console.timeEnd("gltf-transform textureCompress");
-  yield 13 / 15;
+  yield 13 / 15;*/
 
   console.time("gltf-transform draco");
   await document.transform(draco());
