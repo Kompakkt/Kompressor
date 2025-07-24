@@ -1,7 +1,7 @@
 import Elysia, { t } from "elysia";
-import { log } from "node:console";
 import { mkdir, stat } from "node:fs/promises";
 import { convertToGLB } from "./obj2gltf";
+import { basename, extname, join } from "node:path";
 
 const exists = (path: string) =>
   stat(path)
@@ -10,21 +10,27 @@ const exists = (path: string) =>
 
 type State = "QUEUED" | "PROCESSING" | "DONE" | "ERROR";
 
+enum MediaType {
+  "cloud" = "cloud",
+  "model" = "model",
+  "splat" = "splat",
+}
+
 const processingMap = new Map<string, ProcessingEntry>();
 
 class ProcessingEntry {
   id: string;
-  type: "cloud" | "model";
+  type: MediaType;
   state: State = "QUEUED";
   #now = Date.now().toString();
   progress: number = 0;
 
-  constructor(id: string, type: "cloud" | "model") {
+  constructor(id: string, type: MediaType) {
     this.id = id;
     this.type = type;
   }
 
-  static async queue(id: string, type: "cloud" | "model") {
+  static async queue(id: string, type: MediaType) {
     const entry = new ProcessingEntry(id, type);
     processingMap.set(id, entry);
 
@@ -144,6 +150,36 @@ class ProcessingEntry {
     });
   }
 
+  async #useGsbox() {
+    const { inPath, outPath, logFile } = this;
+
+    const glob = new Bun.Glob(`${inPath}/*.{ply,splat,spx}`);
+    const files = await Array.fromAsync(glob.scan());
+
+    if (files.length > 1) {
+      throw new Error("Multiple input files found");
+    }
+
+    if (files.length <= 0) {
+      throw new Error("No input file found");
+    }
+
+    const [inFile] = files;
+    const mkdirResult = await mkdir(outPath, { recursive: true })
+      .then(() => true)
+      .catch(() => false);
+    if (!mkdirResult) {
+      throw new Error("Failed to create output directory");
+    }
+
+    const inFileExt = extname(inFile);
+    const inFileName = basename(inFile, inFileExt);
+    const command = `gsbox ${inFileExt.slice(1)}2spz -rx 180 -i ${inFile} -o ${join(outPath, `${inFileName}.spz`)}`;
+    console.log(`Converting ${inFile} to SPZ...`, command);
+    const process = Bun.$`sh -c "${command}"`;
+    return process;
+  }
+
   async start() {
     const { id, state, type } = this;
     if (state !== "QUEUED" || isAnyProcessing()) {
@@ -151,12 +187,20 @@ class ProcessingEntry {
     }
 
     const promise = (() => {
-      if (type === "cloud") {
-        return this.#useSchwarzwald();
-      } else if (type === "model") {
-        return this.#useObj2Glb();
+      switch (type) {
+        case "cloud": {
+          return this.#useSchwarzwald();
+        }
+        case "splat": {
+          return this.#useGsbox();
+        }
+        case "model": {
+          return this.#useObj2Glb();
+        }
+        default: {
+          return Promise.reject(new Error("Invalid type"));
+        }
       }
-      return Promise.reject(new Error("Invalid type"));
     })();
 
     promise
@@ -183,68 +227,72 @@ const app = new Elysia()
   .get("/", () => ({ status: "OK" }))
   .get(
     "/process/:type/:id",
-    async ({ params: { id, type }, error }) => {
+    async ({ params: { id, type }, status }) => {
       return ProcessingEntry.queue(id, type)
         .then(() => ({ status: "OK", message: "Queued", id }))
         .catch((error) => ({ status: "ERROR", message: error.toString() }));
     },
-    {
-      params: t.Object({
-        id: t.String(),
-        type: t.Enum({
-          cloud: "cloud",
-          model: "model",
-        }),
-      }),
-    },
+    { params: t.Object({ id: t.String(), type: t.Enum(MediaType) }) },
   )
-  .get("/progress/:id", async ({ params: { id }, error }) => {
-    const entry = processingMap.get(id);
-    if (!entry) {
-      return error("Not Found");
-    }
+  .get(
+    "/progress/:id",
+    async ({ params: { id }, status }) => {
+      const entry = processingMap.get(id);
+      if (!entry) {
+        return status("Not Found");
+      }
 
-    if (entry.state === "DONE") {
-      return { progress: 100, finished: true, state: entry.state };
-    }
-    if (entry.state === "ERROR") {
+      if (entry.state === "DONE") {
+        return { progress: 100, finished: true, state: entry.state };
+      }
+      if (entry.state === "ERROR") {
+        return {
+          progress: -1,
+          finished: false,
+          state: entry.state,
+          message: "Processing failed",
+        };
+      }
+      if (entry.state === "QUEUED") {
+        entry.start();
+        return { progress: 0, finished: false, state: entry.state };
+      }
+
       return {
-        progress: -1,
+        progress: entry.progress,
         finished: false,
         state: entry.state,
-        message: "Processing failed",
       };
-    }
-    if (entry.state === "QUEUED") {
-      entry.start();
-      return { progress: 0, finished: false, state: entry.state };
-    }
-
-    return {
-      progress: entry.progress,
-      finished: false,
-      state: entry.state,
-    };
-  })
+    },
+    { params: t.Object({ id: t.String() }) },
+  )
   .get("/queue", () => {
     return [...processingMap.values()].filter(
       (entry) => entry.state === "QUEUED" || entry.state === "PROCESSING",
     );
+  })
+  .get("/force-quit", () => {
+    process.exit(1);
   });
 
 app.listen({ port: 7999 });
 
-const routeDocs = [
-  ["/", "Healthcheck"],
-  ["/process/:type/:id", "Queue processing for id"],
-  ["/progress/:id", "Poll progress for id"],
-  ["/queue", "Get queue status  "],
-];
+const routeDocs: Record<string, string[]> = {
+  "/": ["Healthcheck. Returns { status: 'OK' } if the server is running"],
+  "/process/:type/:id": [
+    `Queue processing for files based on type (${Object.values(MediaType).join(", ")}) and id.`,
+    `Looks for files in "/app/uploads/:type/:id", processes them, and outputs processed files into "/app/uploads/:type/:id/out".`,
+  ],
+  "/progress/:id": ["Poll progress for id"],
+  "/queue": ["Returns all entries that are either queued or processing."],
+};
 
-const maxPathLength = Math.max(...routeDocs.map(([path]) => path.length));
-const routeDocString = routeDocs
-  .map(([path, description]) => path.padEnd(maxPathLength) + "\t" + description)
-  .join("\n");
+const routeDocString = Object.entries(routeDocs)
+  .map(
+    ([path, descriptions]) =>
+      `\x1B[1m${path}\x1B[22m\n` + descriptions.join("\n"),
+  )
+  .join("\n\n");
 
-console.log("Listening on port 7999");
+console.log("Listening on port 7999\n");
 console.log(routeDocString);
