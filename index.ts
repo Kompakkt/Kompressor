@@ -2,6 +2,8 @@ import Elysia, { t } from "elysia";
 import { mkdir, stat } from "node:fs/promises";
 import { convertToGLB } from "./obj2gltf";
 import { basename, extname, join } from "node:path";
+import { convert2xkt, XKT_INFO } from "@xeokit/xeokit-convert";
+import WebIFC from "web-ifc";
 
 const exists = (path: string) =>
   stat(path)
@@ -14,6 +16,7 @@ enum MediaType {
   "cloud" = "cloud",
   "model" = "model",
   "splat" = "splat",
+  "ifc" = "ifc",
 }
 
 const processingMap = new Map<string, ProcessingEntry>();
@@ -180,6 +183,39 @@ class ProcessingEntry {
     return process;
   }
 
+  async #useXeokitConvert() {
+    const { inPath, outPath, logFile } = this;
+
+    const glob = new Bun.Glob(`${inPath}/*.ifc`);
+    const files = await Array.fromAsync(glob.scan());
+
+    if (files.length > 1) {
+      throw new Error("Multiple input files found");
+    }
+
+    if (files.length <= 0) {
+      throw new Error("No input file found");
+    }
+
+    const [inFile] = files;
+    const mkdirResult = await mkdir(outPath, { recursive: true })
+      .then(() => true)
+      .catch(() => false);
+    if (!mkdirResult) {
+      throw new Error("Failed to create output directory");
+    }
+
+    const inFileExt = extname(inFile);
+    const inFileName = basename(inFile, inFileExt);
+
+    return convert2xkt({
+      WebIFC,
+      source: inFile,
+      output: join(outPath, `${inFileName}.v${XKT_INFO.xktVersion}.xkt`),
+      log: (msg: unknown) => console.log(msg),
+    });
+  }
+
   async start() {
     const { id, state, type } = this;
     if (state !== "QUEUED" || isAnyProcessing()) {
@@ -196,6 +232,9 @@ class ProcessingEntry {
         }
         case "model": {
           return this.#useObj2Glb();
+        }
+        case "ifc": {
+          return this.#useXeokitConvert();
         }
         default: {
           return Promise.reject(new Error("Invalid type"));
