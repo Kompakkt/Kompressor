@@ -80,7 +80,7 @@ class ProcessingEntry {
       throw new Error("Failed to create output directory");
     }
 
-    const command = `stdbuf -oL Schwarzwald --tiler --cache-size 256MB --output-format ENTWINE_LAZ -i ${inFile} -o ${outPath} >> ${logFile} 2>&1`;
+    const command = `stdbuf -oL Schwarzwald --tiler --cache-size 256MB --output-format ENTWINE_LAZ -i "${inFile}" -o "${outPath}" >> ${logFile} 2>&1`;
     const process = Bun.$`sh -c "${command}"`;
     let resolved = false;
     process.then(() => {
