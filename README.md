@@ -2,7 +2,7 @@
 
 ElysiaJS based server for pre-processing:
 - OBJ files to GLB files using [obj2gltf](https://github.com/CesiumGS/obj2gltf) & [gltf-transform](https://github.com/donmccurdy/glTF-Transform)
-- LAS/LAZ files using a [modified version](https://github.com/HeyItsBATMAN/schwarzwald) of [schwarzwald](https://github.com/igd-geo/schwarzwald)
+- LAS/LAZ files using [LAStools](https://github.com/LAStools/LAStools)
 - PLY/SPLAT/SPX files to SPZ files using [gsbox](https://github.com/gotoeasy/gsbox)
 - IFC files to XKT files using [xeokit-convert](https://github.com/xeokit/xeokit-convert)
 

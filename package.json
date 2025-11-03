@@ -2,6 +2,7 @@
   "name": "kompressor",
   "module": "index.ts",
   "type": "module",
+  "version": "0.1.2",
   "devDependencies": {
     "@types/bun": "^1.2.19"
   },

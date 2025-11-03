@@ -4,6 +4,7 @@ import { convertToGLB } from "./obj2gltf";
 import { basename, extname, join } from "node:path";
 import { convert2xkt, XKT_INFO } from "@xeokit/xeokit-convert";
 import WebIFC from "web-ifc";
+import packageJson from "./package.json" assert { type: "json" };
 
 const exists = (path: string) =>
   stat(path)
@@ -57,7 +58,7 @@ class ProcessingEntry {
     return `${basePath}/${this.type}/${this.id}/${this.id}_${this.#now}_log.txt`;
   }
 
-  async #useSchwarzwald() {
+  async #useLasCopc() {
     const { inPath, outPath, logFile } = this;
 
     // Find LAS or LAZ input file
@@ -80,42 +81,52 @@ class ProcessingEntry {
       throw new Error("Failed to create output directory");
     }
 
-    const command = `stdbuf -oL Schwarzwald --tiler --cache-size 256MB --output-format ENTWINE_LAZ -i "${inFile}" -o "${outPath}" >> ${logFile} 2>&1`;
-    const process = Bun.$`sh -c "${command}"`;
+    const outFile = join(
+      outPath,
+      basename(inFile).replaceAll(/\.(las|laz)$/gi, "") + ".copc.laz",
+    );
+
+    const command = `stdbuf -oL lascopcindex64 -i "${inFile}" -o "${outFile}" -verbose >> ${logFile} 2>&1`;
+    const process = Bun.$`sh -c "${command}"`.catch(() => {});
     let resolved = false;
     process.then(() => {
       resolved = true;
     });
     return new Promise<void>(async (resolve) => {
       const readProgress = async () => {
-        try {
-          const file = Bun.file(logFile);
-          const content = await file.text();
-          const progressLine = content
-            .split("\n")
-            .filter((line) => line.includes("] indexing:"))
-            .at(-1)!;
-          const [currentString, _, totalString] = progressLine
-            .split(/\s+/)
-            .slice(2, 5);
-          const [current, total] = [currentString, totalString].map((v) => {
-            v = v.replace("k", "").replace(".", "");
-            if (v.includes("M")) {
-              v = v.replace("M", "");
-              return parseFloat(v) * 1000;
+        const file = Bun.file(logFile);
+        const content = await file.text().catch(() => undefined);
+        if (content) {
+          const lines = content.split("\n");
+          const errorLine = lines.find((line) => line.includes("ERROR"));
+          if (errorLine) {
+            console.log("[LAS2COPC ERROR]", errorLine);
+            this.state = "ERROR";
+            return resolve();
+          }
+
+          try {
+            const progressLine = lines
+              .filter((line) => line.includes("] Processed"))
+              .at(-1);
+            if (progressLine) {
+              const percentageString =
+                progressLine
+                  .split(/\s+/)
+                  .at(0)
+                  ?.replaceAll(/[\[\]%]/g, "") || "0";
+              const percentage = parseFloat(percentageString);
+              this.progress = percentage;
             }
-            return parseFloat(v);
-          });
-          const progress = +((current / total) * 100).toFixed(2);
-          this.progress = progress;
-        } catch (_) {}
+          } catch (_) {}
+        }
         setTimeout(() => {
           if (!resolved) {
             readProgress();
           } else {
             resolve();
           }
-        }, 100);
+        }, 500);
       };
       readProgress();
     });
@@ -225,7 +236,7 @@ class ProcessingEntry {
     const promise = (() => {
       switch (type) {
         case "cloud": {
-          return this.#useSchwarzwald();
+          return this.#useLasCopc();
         }
         case "splat": {
           return this.#useGsbox();
@@ -334,4 +345,5 @@ const routeDocString = Object.entries(routeDocs)
   .join("\n\n");
 
 console.log("Listening on port 7999\n");
+console.log(`Kompressor Server v${packageJson.version}`);
 console.log(routeDocString);
