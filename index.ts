@@ -5,6 +5,7 @@ import { basename, extname, join } from "node:path";
 import { convert2xkt, XKT_INFO } from "@xeokit/xeokit-convert";
 import WebIFC from "web-ifc";
 import packageJson from "./package.json" assert { type: "json" };
+import { generateReport } from "copc-validator";
 
 const exists = (path: string) =>
   stat(path)
@@ -74,6 +75,32 @@ class ProcessingEntry {
     }
 
     const [inFile] = files;
+
+    const report = await generateReport({
+      source: inFile,
+      options: { deep: false },
+    }).catch(() => undefined);
+
+    if (!report) {
+      throw new Error(
+        "[COPC-VALIDATOR] Failed to generate report. Input file may be corrupted or unreadable.",
+      );
+    }
+
+    if (report.scan.filetype === "COPC") {
+      console.log(
+        "[COPC-VALIDATOR] File is already COPC format, skipping processing.",
+        inFile,
+      );
+      return Promise.resolve();
+    }
+
+    if (report.scan.filetype !== "LAS") {
+      throw new Error(
+        "[COPC-VALIDATOR] Input file is not a valid LAS/LAZ file",
+      );
+    }
+
     const mkdirResult = await mkdir(outPath, { recursive: true })
       .then(() => true)
       .catch(() => false);
