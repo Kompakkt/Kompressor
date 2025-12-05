@@ -1,10 +1,8 @@
 name: Build gsbox release
 
 on:
-  # Runs every Sunday at 00:00 UTC
   schedule:
     - cron: "0 0 * * 0"
-  # Allows manual triggering
   workflow_dispatch:
 
 env:
@@ -28,12 +26,12 @@ jobs:
         run: |
           cat > Dockerfile << 'EOF'
           # Build stage
-          FROM golang:alpine AS builder
+          FROM golang:bookworm AS builder
 
           WORKDIR /app
 
           # Install build dependencies
-          RUN apk add --no-cache git
+          RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 
           # Copy go mod files first for better caching
           COPY go.mod go.sum ./
@@ -46,12 +44,12 @@ jobs:
           RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o gsbox .
 
           # Final stage - minimal image
-          FROM alpine:latest
+          FROM debian:bookworm-slim
 
           WORKDIR /app
 
           # Install ca-certificates for HTTPS requests (if needed)
-          RUN apk --no-cache add ca-certificates
+          RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 
           # Copy the binary from builder
           COPY --from=builder /app/gsbox /usr/local/bin/gsbox
