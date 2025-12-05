@@ -14,9 +14,9 @@ RUN apt-get update && apt-get -y install git build-essential curl unzip cmake li
 FROM lastools-builder AS gsbox-builder
 
 ## Prepare gsbox ##
-RUN curl -L -o gsbox-amd64-linux-v4.1.1.zip https://github.com/user-attachments/files/22536246/gsbox-amd64-linux-v4.1.1.zip && \
-    unzip gsbox-amd64-linux-v4.1.1.zip -d /usr/local/bin/ && \
-    rm gsbox-amd64-linux-v4.1.1.zip && \
+RUN curl -L -o gsbox-amd64-linux-v4.5.2.zip https://github.com/user-attachments/files/23879981/gsbox-amd64-linux-v4.5.2.zip && \
+    unzip gsbox-amd64-linux-v4.5.2.zip -d /usr/local/bin/ && \
+    rm gsbox-amd64-linux-v4.5.2.zip && \
     chmod +x /usr/local/bin/gsbox && \
     gsbox --version && \
     apt-get remove -y curl unzip && \
