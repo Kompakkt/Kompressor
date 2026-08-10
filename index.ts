@@ -19,6 +19,7 @@ enum MediaType {
   "model" = "model",
   "splat" = "splat",
   "ifc" = "ifc",
+  "audio" = "audio",
 }
 
 const processingMap = new Map<string, ProcessingEntry>();
@@ -274,6 +275,9 @@ class ProcessingEntry {
         case "ifc": {
           return this.#useXeokitConvert();
         }
+        case "audio": {
+          return this.#useFfmpeg();
+        }
         default: {
           return Promise.reject(new Error("Invalid type"));
         }
@@ -292,6 +296,99 @@ class ProcessingEntry {
 
     console.log("Processing started", id);
     this.state = "PROCESSING";
+  }
+
+  async #useFfmpeg() {
+    const { inPath, outPath, logFile } = this;
+
+    const glob = new Bun.Glob(`${inPath}/*.{mp3,wav,flac,m4a,aac,wma,opus,ogg,oga,aiff,webm}`);
+    const files = await Array.fromAsync(glob.scan());
+
+    if (files.length > 1) {
+      throw new Error("Multiple input files found");
+    }
+    if (files.length <= 0) {
+      throw new Error("No input file found");
+    }
+
+    const [inFile] = files;
+    const mkdirResult = await mkdir(outPath, { recursive: true })
+      .then(() => true)
+      .catch(() => false);
+    if (!mkdirResult) {
+      throw new Error("Failed to create output directory");
+    }
+
+    const inFileExt = extname(inFile);
+    const inFileName = basename(inFile, inFileExt);
+    const outFile = join(outPath, `${inFileName}.ogg`);
+
+    const probeCommand =
+      `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${inFile}"`;
+    let totalDurationSeconds = 0;
+    try {
+      const probeOutput = await Bun.$`sh -c "${probeCommand}"`.text();
+      totalDurationSeconds = parseFloat(probeOutput.trim()) || 0;
+    } catch (_) {
+      totalDurationSeconds = 0;
+    }
+
+    const command =
+      `stdbuf -oL ffmpeg -hide_banner -nostdin -i "${inFile}" -y -vn -c:a libvorbis -q:a 5 "${outFile}" -progress pipe:1 >> ${logFile} 2>&1`;
+    console.log(`Converting ${inFile} to OGG Vorbis...`, command);
+
+    const process = Bun.$`sh -c "${command}"`;
+    let resolved = false;
+    let failed = false;
+    process.then(
+      () => {
+        resolved = true;
+      },
+      () => {
+        failed = true;
+        resolved = true;
+      },
+    );
+
+    return new Promise<void>((resolve, reject) => {
+      const readProgress = async () => {
+        const file = Bun.file(logFile);
+        const content = await file.text().catch(() => undefined);
+        if (content) {
+          const lines = content.split("\n");
+
+          const errorLine = lines.find((line) => line.includes("Error"));
+          if (errorLine) {
+            console.log("[FFMPEG ERROR]", errorLine);
+            return reject(new Error("FFmpeg conversion failed: " + errorLine));
+          }
+
+          if (totalDurationSeconds > 0) {
+            try {
+              let lastOutTimeUs = 0;
+              for (const line of lines) {
+                if (line.startsWith("out_time_ms=")) {
+                  lastOutTimeUs = parseInt(line.slice("out_time_ms=".length)) || 0;
+                }
+              }
+              const pct = Math.min(100, (lastOutTimeUs / (totalDurationSeconds * 1_000_000)) * 100);
+              this.progress = +pct.toFixed(2);
+            } catch (_) {}
+          }
+        }
+
+        setTimeout(() => {
+          if (!resolved) {
+            readProgress();
+          } else if (failed) {
+            reject(new Error("FFmpeg exited with a non-zero status"));
+          } else {
+            resolve();
+          }
+        }, 500);
+      };
+      readProgress();
+    });
   }
 }
 
@@ -358,6 +455,7 @@ const routeDocs: Record<string, string[]> = {
   "/": ["Healthcheck. Returns { status: 'OK' } if the server is running"],
   "/process/:type/:id": [
     `Queue processing for files based on type (${Object.values(MediaType).join(", ")}) and id.`,
+    `Audio inputs are converted to OGG Vorbis (-q:a 5, variable bitrate ~160 kbps). Output written to "out/<basename>.ogg".`,
     `Looks for files in "/app/uploads/:type/:id", processes them, and outputs processed files into "/app/uploads/:type/:id/out".`,
   ],
   "/progress/:id": ["Poll progress for id"],

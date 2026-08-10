@@ -22,7 +22,7 @@ FROM docker.io/oven/bun:debian
 RUN apt-get update && apt-get -y install \
     libjpeg62 libpng16-16 libtiff6 libz1 \
     libproj25 liblzma5 libjbig0 libzstd1 \
-    libgeotiff5 libwebp7 libsqlite3-0 && \
+    libgeotiff5 libwebp7 libsqlite3-0 ffmpeg && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
