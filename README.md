@@ -1,19 +1,23 @@
 # Kompressor
 
 ElysiaJS based server for pre-processing:
+
 - OBJ files to GLB files using [obj2gltf](https://github.com/CesiumGS/obj2gltf) & [gltf-transform](https://github.com/donmccurdy/glTF-Transform)
 - LAS/LAZ files using [LAStools](https://github.com/LAStools/LAStools)
 - PLY/SPLAT/SPX files to SPZ files using [gsbox](https://github.com/gotoeasy/gsbox)
-- IFC files to XKT files using [xeokit-convert](https://github.com/xeokit/xeokit-convert)
+- IFC files to [Fragments](https://docs.thatopen.com/fragments/getting-started) files using [@thatopen/fragments](https://github.com/ThatOpen/engine_fragment)
+- Audio files to OGG Vorbis using [FFmpeg](https://ffmpeg.org)
 
 ## Quick Start
 
 Build the dockerfile, e.g.:
+
 ```sh
 docker buildx build -t kompressor -f Dockerfile .
 ```
 
 Run:
+
 ```sh
 docker run -it --rm --name kompressor --publish 7999:7999 -v /path/to/files:/app/uploads kompressor:latest
 ```
@@ -21,12 +25,13 @@ docker run -it --rm --name kompressor --publish 7999:7999 -v /path/to/files:/app
 ## API
 
 The server has the following endpoints:
+
 ```
 /
 Healthcheck. Returns { status: 'OK' } if the server is running
 
 /process/:type/:id
-Queue processing for files based on type (cloud, model, splat, ifc) and id.
+Queue processing for files based on type (cloud, model, splat, audio, ifc) and id.
 Looks for files in "/app/uploads/:type/:id", processes them, and outputs processed files into "/app/uploads/:type/:id/out".
 
 /progress/:id
@@ -36,7 +41,7 @@ Poll progress for id
 Returns all entries that are either queued or processing.
 ```
 
-**Type** is one of 'model', 'cloud', 'splat' or 'ifc'.
+**Type** is one of 'model', 'cloud', 'splat', 'audio' or 'ifc'.
 
 **Id** is the name of the directory containing the files to be processed.
 
@@ -49,6 +54,8 @@ The server inside the docker container expects the following file structure:
 **/app/uploads/cloud** for directories containing LAS/LAZ files to be processed.
 
 **/app/uploads/splat** for directories containing PLY/SPLAT/SPX files to be processed.
+
+**/app/uploads/audio** for directories containing audio files to be processed.
 
 **/app/uploads/ifc** for directories containing IFC files to be processed.
 

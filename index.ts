@@ -1,25 +1,24 @@
-import Elysia, { t } from "elysia";
-import { mkdir, stat } from "node:fs/promises";
-import { convertToGLB } from "./obj2gltf";
-import { basename, extname, join } from "node:path";
-import { convert2xkt, XKT_INFO } from "@xeokit/xeokit-convert";
-import WebIFC from "web-ifc";
-import packageJson from "./package.json" assert { type: "json" };
-import { generateReport } from "copc-validator";
+import Elysia, { t } from 'elysia';
+import { mkdir, stat } from 'node:fs/promises';
+import { convertToGLB } from './obj2gltf';
+import { basename, extname, join } from 'node:path';
+import { IfcImporter } from '@thatopen/fragments';
+import packageJson from './package.json' with { type: 'json' };
+import { generateReport } from 'copc-validator';
 
 const exists = (path: string) =>
   stat(path)
-    .then((stats) => stats.isFile() || stats.isDirectory())
+    .then(stats => stats.isFile() || stats.isDirectory())
     .catch(() => false);
 
-type State = "QUEUED" | "PROCESSING" | "DONE" | "ERROR";
+type State = 'QUEUED' | 'PROCESSING' | 'DONE' | 'ERROR';
 
 enum MediaType {
-  "cloud" = "cloud",
-  "model" = "model",
-  "splat" = "splat",
-  "ifc" = "ifc",
-  "audio" = "audio",
+  cloud = 'cloud',
+  model = 'model',
+  splat = 'splat',
+  ifc = 'ifc',
+  audio = 'audio',
 }
 
 const processingMap = new Map<string, ProcessingEntry>();
@@ -27,7 +26,7 @@ const processingMap = new Map<string, ProcessingEntry>();
 class ProcessingEntry {
   id: string;
   type: MediaType;
-  state: State = "QUEUED";
+  state: State = 'QUEUED';
   #now = Date.now().toString();
   progress: number = 0;
 
@@ -41,7 +40,7 @@ class ProcessingEntry {
     processingMap.set(id, entry);
 
     if (!(await exists(entry.inPath))) {
-      throw "Not Found";
+      throw 'Not Found';
     }
 
     entry.start();
@@ -68,11 +67,11 @@ class ProcessingEntry {
     const files = await Array.fromAsync(glob.scan());
 
     if (files.length > 1) {
-      throw new Error("Multiple input files found");
+      throw new Error('Multiple input files found');
     }
 
     if (files.length <= 0) {
-      throw new Error("No input file found");
+      throw new Error('No input file found');
     }
 
     const [inFile] = files;
@@ -84,35 +83,27 @@ class ProcessingEntry {
 
     if (!report) {
       throw new Error(
-        "[COPC-VALIDATOR] Failed to generate report. Input file may be corrupted or unreadable.",
+        '[COPC-VALIDATOR] Failed to generate report. Input file may be corrupted or unreadable.',
       );
     }
 
-    if (report.scan.filetype === "COPC") {
-      console.log(
-        "[COPC-VALIDATOR] File is already COPC format, skipping processing.",
-        inFile,
-      );
+    if (report.scan.filetype === 'COPC') {
+      console.log('[COPC-VALIDATOR] File is already COPC format, skipping processing.', inFile);
       return Promise.resolve();
     }
 
-    if (report.scan.filetype !== "LAS") {
-      throw new Error(
-        "[COPC-VALIDATOR] Input file is not a valid LAS/LAZ file",
-      );
+    if (report.scan.filetype !== 'LAS') {
+      throw new Error('[COPC-VALIDATOR] Input file is not a valid LAS/LAZ file');
     }
 
     const mkdirResult = await mkdir(outPath, { recursive: true })
       .then(() => true)
       .catch(() => false);
     if (!mkdirResult) {
-      throw new Error("Failed to create output directory");
+      throw new Error('Failed to create output directory');
     }
 
-    const outFile = join(
-      outPath,
-      basename(inFile).replaceAll(/\.(las|laz)$/gi, "") + ".copc.laz",
-    );
+    const outFile = join(outPath, basename(inFile).replaceAll(/\.(las|laz)$/gi, '') + '.copc.laz');
 
     const command = `stdbuf -oL lascopcindex64 -i "${inFile}" -o "${outFile}" -verbose >> ${logFile} 2>&1`;
     const process = Bun.$`sh -c "${command}"`.catch(() => {});
@@ -120,29 +111,27 @@ class ProcessingEntry {
     process.then(() => {
       resolved = true;
     });
-    return new Promise<void>(async (resolve) => {
+    return new Promise<void>(async resolve => {
       const readProgress = async () => {
         const file = Bun.file(logFile);
         const content = await file.text().catch(() => undefined);
         if (content) {
-          const lines = content.split("\n");
-          const errorLine = lines.find((line) => line.includes("ERROR"));
+          const lines = content.split('\n');
+          const errorLine = lines.find(line => line.includes('ERROR'));
           if (errorLine) {
-            console.log("[LAS2COPC ERROR]", errorLine);
-            this.state = "ERROR";
+            console.log('[LAS2COPC ERROR]', errorLine);
+            this.state = 'ERROR';
             return resolve();
           }
 
           try {
-            const progressLine = lines
-              .filter((line) => line.includes("] Processed"))
-              .at(-1);
+            const progressLine = lines.filter(line => line.includes('] Processed')).at(-1);
             if (progressLine) {
               const percentageString =
                 progressLine
                   .split(/\s+/)
                   .at(0)
-                  ?.replaceAll(/[\[\]%]/g, "") || "0";
+                  ?.replaceAll(/[\[\]%]/g, '') || '0';
               const percentage = parseFloat(percentageString);
               this.progress = percentage;
             }
@@ -167,11 +156,11 @@ class ProcessingEntry {
     const files = await Array.fromAsync(glob.scan());
 
     if (files.length > 1) {
-      throw new Error("Multiple input files found");
+      throw new Error('Multiple input files found');
     }
 
     if (files.length <= 0) {
-      throw new Error("No input file found");
+      throw new Error('No input file found');
     }
 
     const [inFile] = files;
@@ -179,11 +168,11 @@ class ProcessingEntry {
       .then(() => true)
       .catch(() => false);
     if (!mkdirResult) {
-      throw new Error("Failed to create output directory");
+      throw new Error('Failed to create output directory');
     }
 
     console.log(`Converting ${inFile} to GLB...`);
-    return new Promise<void>(async (resolve) => {
+    return new Promise<void>(async resolve => {
       for await (const progress of convertToGLB(inFile)) {
         const cleanProgress = +(progress * 100).toFixed(2);
         this.progress = cleanProgress;
@@ -199,11 +188,11 @@ class ProcessingEntry {
     const files = await Array.fromAsync(glob.scan());
 
     if (files.length > 1) {
-      throw new Error("Multiple input files found");
+      throw new Error('Multiple input files found');
     }
 
     if (files.length <= 0) {
-      throw new Error("No input file found");
+      throw new Error('No input file found');
     }
 
     const [inFile] = files;
@@ -211,7 +200,7 @@ class ProcessingEntry {
       .then(() => true)
       .catch(() => false);
     if (!mkdirResult) {
-      throw new Error("Failed to create output directory");
+      throw new Error('Failed to create output directory');
     }
 
     const inFileExt = extname(inFile);
@@ -222,18 +211,18 @@ class ProcessingEntry {
     return process;
   }
 
-  async #useXeokitConvert() {
+  async #useFragments() {
     const { inPath, outPath, logFile } = this;
 
     const glob = new Bun.Glob(`${inPath}/*.ifc`);
     const files = await Array.fromAsync(glob.scan());
 
     if (files.length > 1) {
-      throw new Error("Multiple input files found");
+      throw new Error('Multiple input files found');
     }
 
     if (files.length <= 0) {
-      throw new Error("No input file found");
+      throw new Error('No input file found');
     }
 
     const [inFile] = files;
@@ -241,61 +230,71 @@ class ProcessingEntry {
       .then(() => true)
       .catch(() => false);
     if (!mkdirResult) {
-      throw new Error("Failed to create output directory");
+      throw new Error('Failed to create output directory');
     }
 
     const inFileExt = extname(inFile);
     const inFileName = basename(inFile, inFileExt);
 
-    return convert2xkt({
-      WebIFC,
-      source: inFile,
-      output: join(outPath, `${inFileName}.v${XKT_INFO.xktVersion}.xkt`),
-      log: (msg: unknown) => console.log(msg),
+    const inBuffer = await Bun.file(inFile).arrayBuffer();
+    const inBufferArray = new Uint8Array(inBuffer);
+    const serializer = new IfcImporter();
+    serializer.wasm = {
+      absolute: true,
+      path: join(import.meta.dir, 'node_modules', 'web-ifc') + '/',
+    };
+
+    const fragBytes = await serializer.process({
+      bytes: inBufferArray,
+      progressCallback: (progress, _) => {
+        this.progress = progress * 100;
+      },
     });
+    const outFile = join(outPath, `${inFileName}.frag`);
+    return await Bun.write(outFile, fragBytes);
   }
 
   async start() {
     const { id, state, type } = this;
-    if (state !== "QUEUED" || isAnyProcessing()) {
+    if (state !== 'QUEUED' || isAnyProcessing()) {
       return;
     }
 
     const promise = (() => {
       switch (type) {
-        case "cloud": {
+        case 'cloud': {
           return this.#useLasCopc();
         }
-        case "splat": {
+        case 'splat': {
           return this.#useGsbox();
         }
-        case "model": {
+        case 'model': {
           return this.#useObj2Glb();
         }
-        case "ifc": {
-          return this.#useXeokitConvert();
+        case 'ifc': {
+          return this.#useFragments();
         }
-        case "audio": {
+        case 'audio': {
           return this.#useFfmpeg();
         }
         default: {
-          return Promise.reject(new Error("Invalid type"));
+          return Promise.reject(new Error('Invalid type'));
         }
       }
     })();
 
     promise
       .then(() => {
-        console.log("Process finished", id);
-        this.state = "DONE";
+        console.log('Process finished', id);
+        this.state = 'DONE';
       })
-      .catch((err) => {
-        console.log("Process failed", id, err);
-        this.state = "ERROR";
+      .catch(err => {
+        console.log('Process failed', id, err);
+        this.state = 'ERROR';
       });
 
-    console.log("Processing started", id);
-    this.state = "PROCESSING";
+    console.log('Processing started', id);
+    this.state = 'PROCESSING';
   }
 
   async #useFfmpeg() {
@@ -305,10 +304,10 @@ class ProcessingEntry {
     const files = await Array.fromAsync(glob.scan());
 
     if (files.length > 1) {
-      throw new Error("Multiple input files found");
+      throw new Error('Multiple input files found');
     }
     if (files.length <= 0) {
-      throw new Error("No input file found");
+      throw new Error('No input file found');
     }
 
     const [inFile] = files;
@@ -316,15 +315,14 @@ class ProcessingEntry {
       .then(() => true)
       .catch(() => false);
     if (!mkdirResult) {
-      throw new Error("Failed to create output directory");
+      throw new Error('Failed to create output directory');
     }
 
     const inFileExt = extname(inFile);
     const inFileName = basename(inFile, inFileExt);
     const outFile = join(outPath, `${inFileName}.ogg`);
 
-    const probeCommand =
-      `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${inFile}"`;
+    const probeCommand = `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${inFile}"`;
     let totalDurationSeconds = 0;
     try {
       const probeOutput = await Bun.$`sh -c "${probeCommand}"`.text();
@@ -333,8 +331,7 @@ class ProcessingEntry {
       totalDurationSeconds = 0;
     }
 
-    const command =
-      `stdbuf -oL ffmpeg -hide_banner -nostdin -i "${inFile}" -y -vn -c:a libvorbis -q:a 5 "${outFile}" -progress pipe:1 >> ${logFile} 2>&1`;
+    const command = `stdbuf -oL ffmpeg -hide_banner -nostdin -i "${inFile}" -y -vn -c:a libvorbis -q:a 5 "${outFile}" -progress pipe:1 >> ${logFile} 2>&1`;
     console.log(`Converting ${inFile} to OGG Vorbis...`, command);
 
     const process = Bun.$`sh -c "${command}"`;
@@ -355,20 +352,20 @@ class ProcessingEntry {
         const file = Bun.file(logFile);
         const content = await file.text().catch(() => undefined);
         if (content) {
-          const lines = content.split("\n");
+          const lines = content.split('\n');
 
-          const errorLine = lines.find((line) => line.includes("Error"));
+          const errorLine = lines.find(line => line.includes('Error'));
           if (errorLine) {
-            console.log("[FFMPEG ERROR]", errorLine);
-            return reject(new Error("FFmpeg conversion failed: " + errorLine));
+            console.log('[FFMPEG ERROR]', errorLine);
+            return reject(new Error('FFmpeg conversion failed: ' + errorLine));
           }
 
           if (totalDurationSeconds > 0) {
             try {
               let lastOutTimeUs = 0;
               for (const line of lines) {
-                if (line.startsWith("out_time_ms=")) {
-                  lastOutTimeUs = parseInt(line.slice("out_time_ms=".length)) || 0;
+                if (line.startsWith('out_time_ms=')) {
+                  lastOutTimeUs = parseInt(line.slice('out_time_ms='.length)) || 0;
                 }
               }
               const pct = Math.min(100, (lastOutTimeUs / (totalDurationSeconds * 1_000_000)) * 100);
@@ -381,7 +378,7 @@ class ProcessingEntry {
           if (!resolved) {
             readProgress();
           } else if (failed) {
-            reject(new Error("FFmpeg exited with a non-zero status"));
+            reject(new Error('FFmpeg exited with a non-zero status'));
           } else {
             resolve();
           }
@@ -392,42 +389,42 @@ class ProcessingEntry {
   }
 }
 
-const basePath = "/app/uploads/";
+const basePath = '/app/uploads/';
 
 const isAnyProcessing = () =>
-  [...processingMap.values()].some((entry) => entry.state === "PROCESSING");
+  [...processingMap.values()].some(entry => entry.state === 'PROCESSING');
 
 const app = new Elysia()
-  .get("/", () => ({ status: "OK" }))
+  .get('/', () => ({ status: 'OK' }))
   .get(
-    "/process/:type/:id",
+    '/process/:type/:id',
     async ({ params: { id, type }, status }) => {
       return ProcessingEntry.queue(id, type)
-        .then(() => ({ status: "OK", message: "Queued", id }))
-        .catch((error) => ({ status: "ERROR", message: error.toString() }));
+        .then(() => ({ status: 'OK', message: 'Queued', id }))
+        .catch(error => ({ status: 'ERROR', message: error.toString() }));
     },
     { params: t.Object({ id: t.String(), type: t.Enum(MediaType) }) },
   )
   .get(
-    "/progress/:id",
+    '/progress/:id',
     async ({ params: { id }, status }) => {
       const entry = processingMap.get(id);
       if (!entry) {
-        return status("Not Found");
+        return status('Not Found');
       }
 
-      if (entry.state === "DONE") {
+      if (entry.state === 'DONE') {
         return { progress: 100, finished: true, state: entry.state };
       }
-      if (entry.state === "ERROR") {
+      if (entry.state === 'ERROR') {
         return {
           progress: -1,
           finished: false,
           state: entry.state,
-          message: "Processing failed",
+          message: 'Processing failed',
         };
       }
-      if (entry.state === "QUEUED") {
+      if (entry.state === 'QUEUED') {
         entry.start();
         return { progress: 0, finished: false, state: entry.state };
       }
@@ -440,35 +437,32 @@ const app = new Elysia()
     },
     { params: t.Object({ id: t.String() }) },
   )
-  .get("/queue", () => {
+  .get('/queue', () => {
     return [...processingMap.values()].filter(
-      (entry) => entry.state === "QUEUED" || entry.state === "PROCESSING",
+      entry => entry.state === 'QUEUED' || entry.state === 'PROCESSING',
     );
   })
-  .get("/force-quit", () => {
+  .get('/force-quit', () => {
     process.exit(1);
   });
 
 app.listen({ port: 7999 });
 
 const routeDocs: Record<string, string[]> = {
-  "/": ["Healthcheck. Returns { status: 'OK' } if the server is running"],
-  "/process/:type/:id": [
-    `Queue processing for files based on type (${Object.values(MediaType).join(", ")}) and id.`,
+  '/': ["Healthcheck. Returns { status: 'OK' } if the server is running"],
+  '/process/:type/:id': [
+    `Queue processing for files based on type (${Object.values(MediaType).join(', ')}) and id.`,
     `Audio inputs are converted to OGG Vorbis (-q:a 5, variable bitrate ~160 kbps). Output written to "out/<basename>.ogg".`,
     `Looks for files in "/app/uploads/:type/:id", processes them, and outputs processed files into "/app/uploads/:type/:id/out".`,
   ],
-  "/progress/:id": ["Poll progress for id"],
-  "/queue": ["Returns all entries that are either queued or processing."],
+  '/progress/:id': ['Poll progress for id'],
+  '/queue': ['Returns all entries that are either queued or processing.'],
 };
 
 const routeDocString = Object.entries(routeDocs)
-  .map(
-    ([path, descriptions]) =>
-      `\x1B[1m${path}\x1B[22m\n` + descriptions.join("\n"),
-  )
-  .join("\n\n");
+  .map(([path, descriptions]) => `\x1B[1m${path}\x1B[22m\n` + descriptions.join('\n'))
+  .join('\n\n');
 
-console.log("Listening on port 7999\n");
+console.log('Listening on port 7999\n');
 console.log(`Kompressor Server v${packageJson.version}`);
 console.log(routeDocString);
