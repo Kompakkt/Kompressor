@@ -8,7 +8,7 @@
         "@gltf-transform/core": "^4.5.0",
         "@gltf-transform/extensions": "^4.5.0",
         "@gltf-transform/functions": "^4.5.0",
-        "@kompakkt/fragments": "git+https://github.com/Kompakkt/engine_fragment.git#48e673aa400b3d9636deef6d2eb1ba7f841641fa",
+        "@kompakkt/fragments": "git+https://github.com/Kompakkt/engine_fragment.git#33025697f861073028ceedb7952962552a553fe0",
         "@thatopen/fragments": "^3.4.7",
         "copc-validator": "^0.4.5",
         "draco3dgltf": "^1.5.7",
@@ -103,7 +103,7 @@
 
     "@img/sharp-win32-x64": ["@img/sharp-win32-x64@0.35.4", "", { "os": "win32", "cpu": "x64" }, "sha512-XtmnYhBcrORsJ4XJngyzr/EWP0hRZLAZRFaApdKuviyqF78+ylxh2y06ZmtULAMOnObJ3ucpN0AcwSWnMowTRg=="],
 
-    "@kompakkt/fragments": ["@kompakkt/fragments@github:Kompakkt/engine_fragment#48e673a", { "dependencies": { "flatbuffers": "25.2.10" } }, "Kompakkt-engine_fragment-48e673a", "sha512-K+BruWOHXSMGGxZ4MmzLORMZWkGOBOPKVJbkQYa6EUHm+ay4Qt0ShMwtqKrfkMXX3NxIIrpMg1aQrcd7vmIoFA=="],
+    "@kompakkt/fragments": ["@kompakkt/fragments@github:Kompakkt/engine_fragment#3302569", { "dependencies": { "flatbuffers": "25.2.10" } }, "Kompakkt-engine_fragment-3302569", "sha512-D2f+4rm9Nc6QgUYHu7xMyTUe3oTmVy6ykp1JOw1NYoIBxmjGwQC8/HQD6+mJTXFzXKHp69pYi6yn2JPBWM+F8Q=="],
 
     "@landrush/proj4": ["@landrush/proj4@2.7.7", "", { "dependencies": { "@landrush/wkt-parser": "^1.3.1", "mgrs": "1.0.0" } }, "sha512-Ij0UkZgS37nx3NHzpmnPGGUalKPGcSjGuXBWnDW4UzmIUQNAS8RZKGsRySunZh7ZPjOlZst72u3erhqBbt3Xsw=="],
 

@@ -30,7 +30,7 @@
     "@gltf-transform/core": "^4.5.0",
     "@gltf-transform/extensions": "^4.5.0",
     "@gltf-transform/functions": "^4.5.0",
-    "@kompakkt/fragments": "git+https://github.com/Kompakkt/engine_fragment.git#48e673aa400b3d9636deef6d2eb1ba7f841641fa",
+    "@kompakkt/fragments": "git+https://github.com/Kompakkt/engine_fragment.git#33025697f861073028ceedb7952962552a553fe0",
     "@thatopen/fragments": "^3.4.7",
     "copc-validator": "^0.4.5",
     "draco3dgltf": "^1.5.7",
