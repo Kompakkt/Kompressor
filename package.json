@@ -17,13 +17,21 @@
     "oxlint-tsgolint": "^7.0.2001"
   },
   "peerDependencies": {
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "earcut": "^3.0.1",
+    "flatbuffers": "25.2.10",
+    "lru-cache": "11.1.0",
+    "pako": "2.1.0",
+    "three": "^0.186.0",
+    "three-mesh-bvh": "^0.9.15",
+    "xxhash-wasm": "^1.1.0"
   },
   "dependencies": {
     "@gltf-transform/core": "^4.5.0",
     "@gltf-transform/extensions": "^4.5.0",
     "@gltf-transform/functions": "^4.5.0",
     "@kompakkt/fragments": "git+https://github.com/Kompakkt/engine_fragment.git#48e673aa400b3d9636deef6d2eb1ba7f841641fa",
+    "@thatopen/fragments": "^3.4.7",
     "copc-validator": "^0.4.5",
     "draco3dgltf": "^1.5.7",
     "elysia": "^1.4.30",
