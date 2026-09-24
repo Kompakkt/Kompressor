@@ -2,7 +2,7 @@ import Elysia, { t } from 'elysia';
 import { mkdir, stat } from 'node:fs/promises';
 import { convertToGLB } from './obj2gltf';
 import { basename, extname, join } from 'node:path';
-import { IfcImporter } from '@thatopen/fragments';
+import { IfcImporter } from '@kompakkt/fragments/ifc-importer';
 import packageJson from './package.json' with { type: 'json' };
 import { generateReport } from 'copc-validator';
 
