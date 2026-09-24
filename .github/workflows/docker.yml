@@ -48,8 +48,10 @@ jobs:
           provenance: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:latest
-          cache-to: type=inline
+          cache-from: |
+            type=gha
+            type=registry,ref=ghcr.io/${{ github.repository }}:latest
+          cache-to: type=gha,mode=max
 
       - name: Remove untagged container images
         uses: actions/delete-package-versions@v5
