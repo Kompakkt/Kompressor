@@ -6,13 +6,12 @@
   "scripts": {
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
-    "format": "oxfmt",
-    "format:check": "oxfmt --check",
+    "format": "bun fmt",
+    "format:check": "bun fmt --check",
     "update:kompakkt:fragments": "bun run update-git-dependency.ts -d @kompakkt/fragments -o Kompakkt -r engine_fragment -b main"
   },
   "devDependencies": {
     "@types/bun": "^1.4.2",
-    "oxfmt": "^0.68.0",
     "oxlint": "^1.83.0",
     "oxlint-tsgolint": "^7.0.2001"
   },
@@ -35,7 +34,7 @@
     "copc-validator": "^0.4.5",
     "draco3dgltf": "^1.5.7",
     "elysia": "^1.4.30",
-    "obj2gltf": "3.2.0",
+    "obj2gltf": "3.1.6",
     "sharp": "^0.35.4",
     "web-ifc": "^0.0.77"
   },
